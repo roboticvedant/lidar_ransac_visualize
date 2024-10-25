@@ -1,0 +1,130 @@
+import time
+import numpy as np
+import open3d as o3d
+import os
+from visual_tools import *  # Assuming this is your existing function
+
+class VisualizerSequence:
+    def __init__(self, cloud_dir, label_dir, start_idx=0, debug_flag=True, frame_interval=200):
+        self.cloud_dir = cloud_dir
+        self.label_dir = label_dir
+        self.idx = start_idx
+        self.debug_flag = debug_flag
+        self.frame_interval = frame_interval  # Time in milliseconds
+        self.vis = o3d.visualization.VisualizerWithKeyCallback()
+        self.zoom_factor = 1.0  # Default zoom level
+
+    def load_bin_as_pcd(self, bin_file):
+        """Load point cloud from a .bin file (x, y, z, intensity)."""
+        point_cloud_data = np.fromfile(bin_file, dtype=np.float32).reshape(-1, 4)
+        points = point_cloud_data[:, :3]  # Extract x, y, z coordinates
+        return points
+    
+    def extract_numbers_from_file(self, file_path):
+        """Extract the bounding boxes from a .txt file, returning them as a numpy array."""
+        numbers_list = []
+        with open(file_path, 'r') as file:
+            for line in file:
+                parts = line.strip().split(',')
+                numbers = list(map(float, parts))  # Convert to float, skipping label
+                numbers_list.append(numbers)
+        return np.array(numbers_list)
+
+    def dataloader(self, cloud_path, boxes_path):
+        """Load both the point cloud and bounding boxes."""
+        cloud = self.load_bin_as_pcd(cloud_path)
+        boxes = self.extract_numbers_from_file(boxes_path).reshape(-1, 4)
+        return cloud, boxes
+
+    def apply_zoom(self):
+        """Apply the current zoom level to the view control."""
+        ctr = self.vis.get_view_control()
+        ctr.set_zoom(self.zoom_factor)
+
+    def next_scene(self):
+        """Load and display the next frame."""
+        self.vis.clear_geometries()
+
+        cloud_file = f'{self.cloud_dir}/{self.idx:06d}.bin'
+        label_file = f'{self.label_dir}/{self.idx:06d}.txt'
+
+        if not (os.path.exists(cloud_file) and os.path.exists(label_file)):
+            print(f"No more files found at index {self.idx:06d}")
+            return False
+
+        print(f"Processing: {cloud_file}")
+        cloud, boxes = self.dataloader(cloud_file, label_file)
+
+        # Draw the point cloud and bounding boxes
+        draw_clouds_with_boxes(self.vis, cloud, boxes)
+        draw_ransac_road(self.vis, cloud, boxes, expansion_ratio=0.5, distance_threshold=0.1, ransac_n=3, num_iterations=1000)
+
+        # Apply the zoom level
+        self.apply_zoom()
+
+        if self.debug_flag:
+            print(f"Debugging: Full animation and RANSAC applied for frame {self.idx}")
+        else:
+            print(f"Frame {self.idx}: Moving without running full animation")
+
+        self.idx += 1
+        self.vis.poll_events()
+        self.vis.update_renderer()
+        return True
+
+    def key_callback(self, vis):
+        """Key callback to handle 'N' key presses for the next frame."""
+        return self.next_scene()
+
+    def auto_update_callback(self, vis):
+        """Automatically update the frames at the specified interval."""
+        if self.next_scene():
+            time.sleep(self.frame_interval / 1000.0)  # Convert milliseconds to seconds
+        return True
+
+    def zoom_in(self, vis):
+        """Zoom into the scene and store the zoom level."""
+        ctr = self.vis.get_view_control()
+        current_zoom = self.zoom_factor  # Get the current zoom level
+        new_zoom = current_zoom * 0.9  # Zoom in by reducing the zoom value
+        ctr.set_zoom(new_zoom)  # Set the new zoom level
+        self.zoom_factor = new_zoom  # Store the updated zoom factor
+        return True
+
+    def zoom_out(self, vis):
+        """Zoom out of the scene and store the zoom level."""
+        ctr = self.vis.get_view_control()
+        current_zoom = self.zoom_factor  # Get the current zoom level
+        new_zoom = current_zoom * 1.1  # Zoom out by increasing the zoom value
+        ctr.set_zoom(new_zoom)  # Set the new zoom level
+        self.zoom_factor = new_zoom  # Store the updated zoom factor
+        return True
+
+    def run(self):
+        """Set up the visualizer and start the sequence."""
+        self.vis.create_window()
+        self.vis.register_key_callback(ord('N'), self.key_callback)
+
+        # Register additional key callbacks for zoom
+        self.vis.register_key_callback(ord('I'), self.zoom_in)
+        self.vis.register_key_callback(ord('O'), self.zoom_out)
+
+        if not self.debug_flag:
+            # Register automatic frame progression if debug_flag is False
+            self.vis.register_animation_callback(self.auto_update_callback)
+
+        # Start the first frame
+        self.next_scene()
+
+        # Start the Open3D visualizer event loop
+        self.vis.run()
+        self.vis.destroy_window()
+
+if __name__ == "__main__":
+    # Directory paths to cloud and label files
+    cloud_directory = 'RACECAR_DATA/data/cloud'
+    label_directory = 'RACECAR_DATA/data/labels'
+
+    # Create the visualizer sequence object and run it with automatic frame progression
+    visualizer = VisualizerSequence(cloud_directory, label_directory, start_idx=230, debug_flag=False, frame_interval=10)
+    visualizer.run()
