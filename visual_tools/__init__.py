@@ -140,7 +140,20 @@ def draw_clouds_with_boxes(vis, cloud, boxes):
     # vis.capture_screen_image("pointcloud_top_view.png")  # Save the image as a PNG file
 
     # Clean up and close the window
+
+def draw_fixed_boxes(vis, boxes, plane_model):
     
+    boxes_o3d = []
+    cur_box_color = [0, 1, 1]
+
+    # create boxes
+    for box in boxes:
+        box_o3d, arrow = create_box_with_arrow(box, cur_box_color)
+        boxes_o3d.append(box_o3d)
+        boxes_o3d.append(arrow)
+    
+    # add_geometry for boxes
+    [vis.add_geometry(element) for element in boxes_o3d]
 
 def create_grid(size=10, step=1.0):
     """

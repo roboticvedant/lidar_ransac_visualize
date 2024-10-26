@@ -13,6 +13,7 @@ class VisualizerSequence:
         self.frame_interval = frame_interval  # Time in milliseconds
         self.vis = o3d.visualization.VisualizerWithKeyCallback()
         self.zoom_factor = 1.0  # Default zoom level
+        self.is_side_view = False  # Track whether the current view is side or top
 
     def load_bin_as_pcd(self, bin_file):
         """Load point cloud from a .bin file (x, y, z, intensity)."""
@@ -41,6 +42,38 @@ class VisualizerSequence:
         ctr = self.vis.get_view_control()
         ctr.set_zoom(self.zoom_factor)
 
+    def set_side_view(self):
+        """Set the camera to a side view."""
+        ctr = self.vis.get_view_control()
+        lookat = [0, 0, 0]  # Adjust the point of interest based on your scene
+        front = [1, 0, 0]   # Looking from the side along the X-axis
+        up = [0, 0, 1]      # Z-axis as "up" direction
+
+        ctr.set_lookat(lookat)
+        ctr.set_front(front)
+        ctr.set_up(up)
+        ctr.set_zoom(self.zoom_factor)  # Apply the current zoom level
+
+    def set_top_view(self):
+        """Set the camera to a top-down view."""
+        ctr = self.vis.get_view_control()
+        lookat = [0, 0, 0]  # Adjust the point of interest based on your scene
+        front = [0, 1, 0.25]  
+        up = [0, 0, 1]    
+
+        ctr.set_lookat(lookat)
+        ctr.set_front(front)
+        ctr.set_up(up)
+        ctr.set_zoom(self.zoom_factor)  # Apply the current zoom level
+
+    def toggle_view(self):
+        """Toggle between side and top view."""
+        if self.is_side_view:
+            self.set_top_view()
+        else:
+            self.set_side_view()
+        self.is_side_view = not self.is_side_view  # Toggle the flag
+
     def next_scene(self):
         """Load and display the next frame."""
         self.vis.clear_geometries()
@@ -57,10 +90,15 @@ class VisualizerSequence:
 
         # Draw the point cloud and bounding boxes
         draw_clouds_with_boxes(self.vis, cloud, boxes)
-        draw_ransac_road(self.vis, cloud, boxes, expansion_ratio=0.5, distance_threshold=0.1, ransac_n=3, num_iterations=1000)
+        draw_ransac_road(self.vis, cloud, boxes, expansion_ratio=1, distance_threshold=0.1, ransac_n=3, num_iterations=1000)
 
-        # Apply the zoom level
+        # Apply the zoom level and persist the current view (side or top)
         self.apply_zoom()
+
+        if self.is_side_view:
+            self.set_side_view()
+        else:
+            self.set_top_view()
 
         if self.debug_flag:
             print(f"Debugging: Full animation and RANSAC applied for frame {self.idx}")
@@ -105,9 +143,10 @@ class VisualizerSequence:
         self.vis.create_window()
         self.vis.register_key_callback(ord('N'), self.key_callback)
 
-        # Register additional key callbacks for zoom
+        # Register additional key callbacks for zoom and toggling view
         self.vis.register_key_callback(ord('I'), self.zoom_in)
         self.vis.register_key_callback(ord('O'), self.zoom_out)
+        self.vis.register_key_callback(ord('S'), lambda vis: self.toggle_view())  # Toggle view on 'S'
 
         if not self.debug_flag:
             # Register automatic frame progression if debug_flag is False
@@ -126,5 +165,5 @@ if __name__ == "__main__":
     label_directory = 'RACECAR_DATA/data/labels'
 
     # Create the visualizer sequence object and run it with automatic frame progression
-    visualizer = VisualizerSequence(cloud_directory, label_directory, start_idx=230, debug_flag=False, frame_interval=10)
+    visualizer = VisualizerSequence(cloud_directory, label_directory, start_idx=230, debug_flag=True, frame_interval=10)
     visualizer.run()
