@@ -148,7 +148,7 @@ def create_ransac_plane_visualization(rotated_corners_original, plane_model):
     
     return plane_mesh, box
 
-def create_full_box_from_plane(plane_corners, height=1.5, color=[0, 1, 1]):
+def create_full_box_from_plane(plane_corners, height=1.5, color=[0, 0, 1]):
 
     top_plane_corners = plane_corners.copy()
     top_plane_corners[:, 2] += height  # Increase Z values by the box height

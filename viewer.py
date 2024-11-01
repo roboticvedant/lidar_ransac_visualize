@@ -57,7 +57,9 @@ class VisualizerSequence:
     def set_top_view(self):
         """Set the camera to a top-down view."""
         ctr = self.vis.get_view_control()
-        lookat = [0, 0, 0]  # Adjust the point of interest based on your scene
+        
+        # lookat = [0, 0, 0]  # Adjust the point of interest based on your scene
+        lookat = [self.opponent_pos[0], self.opponent_pos[1], self.opponent_pos[2]] 
         front = [0, 1, 0.25]  
         up = [0, 0, 1]    
 
@@ -87,6 +89,8 @@ class VisualizerSequence:
 
         print(f"Processing: {cloud_file}")
         cloud, boxes = self.dataloader(cloud_file, label_file)
+
+        self.opponent_pos = boxes[0][:3]
 
         # Draw the point cloud and bounding boxes
         draw_clouds_with_boxes(self.vis, cloud, boxes)
@@ -165,5 +169,5 @@ if __name__ == "__main__":
     label_directory = 'RACECAR_DATA/data/labels'
 
     # Create the visualizer sequence object and run it with automatic frame progression
-    visualizer = VisualizerSequence(cloud_directory, label_directory, start_idx=230, debug_flag=True, frame_interval=10)
+    visualizer = VisualizerSequence(cloud_directory, label_directory, start_idx=0, debug_flag=False, frame_interval=10)
     visualizer.run()
