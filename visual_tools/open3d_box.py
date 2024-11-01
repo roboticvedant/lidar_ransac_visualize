@@ -9,7 +9,7 @@ def rotz(t):
     return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
 
 
-def box2corners(box):
+def box2corners(box, original = False):
     """
     box: [x, y, z, dx, dy, dz, yaw]
     """
@@ -29,25 +29,26 @@ def box2corners(box):
     #             |
     # dy(w)       |
     # <-----------O
+   # Extract box parameters
+    x, y, z = box[:3]
+    if original:
+        l, w, h = box[3:6]  # dx, dy, dz
+        yaw = box[6]
+        rear_axle = 0
+    else:
+        l = 4.5  # Default dx (length)
+        w = 2.0  # Default dy (width)
+        h = 1.5  # Default dz (height)
+        yaw = box[3]  # Yaw from input
+        rear_axle = -0.5
 
-    x = box[0]
-    y = box[1]
-    z = box[2]
-
-    l = 4.5  # dx
-    w = 2  # dy
-    h = 1.5  # dz
-
-    yaw = box[3]
-
-    # 3d bounding box corners
-    Box = np.array(
-        [
-            [-0.5, -0.5, l , l , -0.5, -0.5, l , l],
-            [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2],
-            [0, 0, 0, 0, h , h , h , h ],
-        ]
-    )
+        Box = np.array(
+            [
+                [rear_axle, rear_axle, l , l , rear_axle, rear_axle, l , l],
+                [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2],
+                [0, 0, 0, 0, h , h , h , h ],
+            ]
+        )
 
     R = rotz(yaw)
     corners_3d = np.dot(R, Box)  # corners_3d: (3, 8)
@@ -93,6 +94,8 @@ def create_box_from_corners(corners, color=None):
     line_set.lines = o3d.utility.Vector2iVector(lines)
     line_set.colors = o3d.utility.Vector3dVector(colors)
 
+    #Also return Box in this format box: [x, y, z, dx, dy, dz, yaw]
+
     return line_set
 
 
@@ -103,3 +106,4 @@ def create_box(box, color=None):
     box_corners = box2corners(box)
     box = create_box_from_corners(box_corners, color)
     return box
+

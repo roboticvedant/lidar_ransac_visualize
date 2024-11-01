@@ -196,4 +196,9 @@ def create_coordinate(size=1.0, origin=[0, 0, 0]):
 
 
 def draw_ransac_road(vis, cloud, boxes, expansion_ratio, distance_threshold, ransac_n, num_iterations):
-    visualize_with_ransac_plane(vis, cloud, boxes,expansion_ratio, distance_threshold, ransac_n, num_iterations)
+    _,opponent_fixed_box = visualize_with_ransac_plane(vis, cloud, boxes,expansion_ratio, distance_threshold, ransac_n, num_iterations)
+    return opponent_fixed_box
+
+def visualize_fixed_data(vis, idx):
+    draw_clouds_with_boxes(vis,cloud, boxes)
+    visualize_corrected_data(vis, idx);

@@ -3,13 +3,15 @@ import numpy as np
 import open3d as o3d
 import os
 from visual_tools import *  # Assuming this is your existing function
+import shutil
 
 class VisualizerSequence:
-    def __init__(self, cloud_dir, label_dir, start_idx=0, debug_flag=True, frame_interval=200):
+    def __init__(self, cloud_dir, label_dir, start_idx=0, debug_flag=True,generating_data= False, frame_interval=200):
         self.cloud_dir = cloud_dir
         self.label_dir = label_dir
         self.idx = start_idx
         self.debug_flag = debug_flag
+        self.generating_data = generating_data
         self.frame_interval = frame_interval  # Time in milliseconds
         self.vis = o3d.visualization.VisualizerWithKeyCallback()
         self.zoom_factor = 1.0  # Default zoom level
@@ -92,9 +94,12 @@ class VisualizerSequence:
 
         self.opponent_pos = boxes[0][:3]
 
-        # Draw the point cloud and bounding boxes
-        draw_clouds_with_boxes(self.vis, cloud, boxes)
-        draw_ransac_road(self.vis, cloud, boxes, expansion_ratio=1, distance_threshold=0.1, ransac_n=3, num_iterations=1000)
+        if self.generating_data:
+            # Draw the point cloud and bounding boxes
+            draw_clouds_with_boxes(self.vis, cloud, boxes)
+            self.fixedOpponentBox= draw_ransac_road(self.vis, cloud, boxes, expansion_ratio=1, distance_threshold=0.1, ransac_n=3, num_iterations=1000)
+        else:
+            self.ShowCorrectData(self.vis, self.idx)
 
         # Apply the zoom level and persist the current view (side or top)
         self.apply_zoom()
@@ -141,6 +146,43 @@ class VisualizerSequence:
         ctr.set_zoom(new_zoom)  # Set the new zoom level
         self.zoom_factor = new_zoom  # Store the updated zoom factor
         return True
+    
+    def SaveCorrectedBox(self):
+        # Save the corrected box parameters as a text file
+        save_path_txt = os.path.join("CorrectedData", "labels", f'{self.idx - 1:06d}.txt')
+        exportCorrectedBox(self.fixedOpponentBox, save_path_txt)
+        
+        # Copy the original .bin file to the corrected data directory
+        original_bin_file = os.path.join(self.cloud_dir, f'{self.idx - 1:06d}.bin')
+        corrected_bin_file = os.path.join("CorrectedData", "cloud", f'{self.idx - 1:06d}.bin')
+        os.makedirs(os.path.dirname(corrected_bin_file), exist_ok=True)
+
+        if os.path.exists(original_bin_file):
+            shutil.copyfile(original_bin_file, corrected_bin_file)
+            print(f"Copied {original_bin_file} to {corrected_bin_file}")
+        else:
+            print(f"Original .bin file {original_bin_file} not found")
+            return False
+
+        return True
+
+    def load_boxes_from_corrected_data(self, corrected_txt_file):
+        """Load box parameters from a .txt file in CorrectedData."""
+        if not os.path.exists(corrected_txt_file):
+            print(f"File {corrected_txt_file} not found")
+            return None
+
+        boxes = []
+        with open(corrected_txt_file, 'r') as file:
+            for line in file:
+                parts = list(map(float, line.strip().split()))
+                boxes.append(parts)  # Append box in format [x, y, z, dx, dy, dz, yaw]
+        return np.array(boxes)
+
+    def ShowCorrectData(self, vis, idx):
+        """Visualize point cloud and boxes from CorrectedData."""
+        visualize_fixed_data(vis, idx)
+        return True
 
     def run(self):
         """Set up the visualizer and start the sequence."""
@@ -150,7 +192,8 @@ class VisualizerSequence:
         # Register additional key callbacks for zoom and toggling view
         self.vis.register_key_callback(ord('I'), self.zoom_in)
         self.vis.register_key_callback(ord('O'), self.zoom_out)
-        self.vis.register_key_callback(ord('S'), lambda vis: self.toggle_view())  # Toggle view on 'S'
+        self.vis.register_key_callback(ord('V'), lambda vis: self.toggle_view())  # Toggle view on 'V'
+        self.vis.register_key_callback(ord('S'), lambda vis: self.SaveCorrectedBox())  # Save corrected box on 'S'
 
         if not self.debug_flag:
             # Register automatic frame progression if debug_flag is False
@@ -169,5 +212,5 @@ if __name__ == "__main__":
     label_directory = 'RACECAR_DATA/data/labels'
 
     # Create the visualizer sequence object and run it with automatic frame progression
-    visualizer = VisualizerSequence(cloud_directory, label_directory, start_idx=0, debug_flag=False, frame_interval=10)
+    visualizer = VisualizerSequence(cloud_directory, label_directory, start_idx=0, debug_flag=True, frame_interval=10)
     visualizer.run()
