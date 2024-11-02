@@ -1,6 +1,6 @@
-# VisualizerSequence Tool
+# PointCloud Visualizer & Correction Tool
 
-This tool visualizes point cloud data and bounding boxes from `.bin` and `.txt` files using Open3D. It supports zoom controls, frame-by-frame navigation, and automatic frame progression.
+This tool visualizes point cloud data and bounding boxes from `.bin` and `.txt` files using Open3D. It supports features such as zoom controls, frame-by-frame navigation, automatic frame progression, and saving corrected data with RANSAC plane fitting.
 
 ## Prerequisites
 
@@ -8,7 +8,7 @@ Ensure that you have **Conda** installed on your machine. You can install [Minic
 
 ## Setting Up the Environment
 
-To ensure you have the correct dependencies and packages, you can recreate the conda environment by following these steps:
+To set up the environment with the required dependencies, follow these steps:
 
 1. **Clone the Repository**:
    ```bash
@@ -28,68 +28,71 @@ To ensure you have the correct dependencies and packages, you can recreate the c
    ```
 
 4. **Verify Installation**:
-   - You can verify the environment by checking the installed packages:
+   - Verify the environment by checking the installed packages:
      ```bash
      conda list
      ```
 
 ## Running the Visualizer
 
-1. **Prepare Data**: 
-   - Ensure your point cloud files (`.bin`) and bounding box files (`.txt`) are stored in separate directories.
-   - Example directory structure:
-     ```
-     RACECAR_DATA/
-       └── data/
-           ├── cloud/    # Contains .bin point cloud files
-           └── labels/   # Contains .txt label files
-     ```
+### Command-Line Arguments
 
-2. **Run the Script**:
-   - Use the following command to run the visualizer:
-     ```bash
-     python viewer.py
-     ```
+- **`-r`, `--raw_data_dir`** (default: `RACECAR_DATA/data/`): Path to the directory containing raw point cloud data.
+- **`-f`, `--fixed_data_dir`** (default: `RACECAR_DATA/correctedData/`): Path to the directory where corrected data will be stored.
+- **`-p`, `--play_animation`**: Enable automatic frame progression.
+- **`-g`, `--generate`**: Generate corrected data and save it.
+- **`-n`, `--no_ransac`**: Disable RANSAC visualization.
+- **`-s`, `--start_idx`** (default: `0`): The starting index for visualization.
+- **`-i`, `--frame_interval`** (default: `200` ms): Time in milliseconds between frames for automatic progression.
+- **`-l`, `--length_of_car`** (default: `5.0`): Length of the car.
+- **`-w`, `--width_of_car`** (default: `2.0`): Width of the car.
+- **`-hc`, `--height_of_car`** (default: `2.0`): Height of the car.
+- **`-a`, `--axle_from_center`** (default: `2.0`): Distance from the center to the rear axle.
+- **`-hr`, `--height_of_rear_axle`** (default: `0.5`): Height of the rear axle from the ground.
 
-3. **Script Parameters**:
-   - `cloud_directory`: Path to the directory containing point cloud (`.bin`) files.
-   - `label_directory`: Path to the directory containing bounding box (`.txt`) files.
-   - `start_idx`: The starting index of the frames to load (e.g., `000230.bin` and `000230.txt`).
-   - `debug_flag`: Set `True` for debugging mode, which enables detailed logging of frames and the RANSAC plane fit process.
-   - `frame_interval`: Time interval between frames in milliseconds when automatic frame progression is enabled.
+### Example Command
 
-4. **Example**:
-   - To visualize frames starting from frame `230` with automatic progression every 10 milliseconds:
-     ```bash
-     python viewer.py
-     ```
+To run the script with default parameters:
 
-## Key Commands
+```bash
+python viewer.py -r path/to/raw_data -f path/to/fixed_data -p -g -s 100 -i 100
+```
+
+### Key Commands During Visualization
 
 - **N**: Load the next frame manually.
-- **I**: Zoom into the scene.
-- **O**: Zoom out of the scene.
+- **I**: Zoom in.
+- **O**: Zoom out.
+- **V**: Toggle between side and top views.
+- **S**: Save the corrected bounding box to a text file.
 
-## Flags
+## Directory Structure
 
-- **debug_flag (bool)**: 
-  - Set to `True` to enable full debugging information and disable automatic frame progression.
-  - Default: `False`.
-  
-- **frame_interval (int)**:
-  - Time (in milliseconds) between each frame when automatic progression is enabled.
-  - Default: `200` milliseconds.
+Ensure your data is structured as follows:
 
-## Example Usage
+```
+RACECAR_DATA/
+  └── data/
+      ├── cloud/    # Contains .bin point cloud files
+      └── labels/   # Contains .txt label files
+```
+
+## Example Usage in Python
 
 ```python
-# Create the visualizer sequence object and run it with automatic frame progression
 visualizer = VisualizerSequence(
-    cloud_dir="RACECAR_DATA/data/cloud", 
-    label_dir="RACECAR_DATA/data/labels", 
-    start_idx=230, 
-    debug_flag=False, 
-    frame_interval=10
+    raw_data_dir="RACECAR_DATA/data/",
+    fixed_data_dir="RACECAR_DATA/correctedData/",
+    start_idx=230,
+    play_animation=True,
+    generating_data=True,
+    ransac_visualize_flag=True,
+    frame_interval=200,
+    length_of_car=5.0,
+    width_of_car=2.0,
+    height_of_car=2.0,
+    axle_from_center=2.0,
+    height_of_rear_axle=0.5
 )
 visualizer.run()
 ```
