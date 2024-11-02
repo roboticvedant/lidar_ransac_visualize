@@ -8,18 +8,18 @@ from .open3d_box import create_box
 from .ransac_visualization import *
 
 
-def create_box_with_arrow(box, color=None):
+def create_box_with_arrow(box, length_of_car, width_of_car, height_of_car, rear_axle_from_center, height_of_rear_axle, color=None,):
     """
     box: list(8) [ x, y, z, dx, dy, dz, yaw]
     """
 
-    box_o3d = create_box(box, color)
+    box_o3d = create_box(box, color, length_of_car, width_of_car, height_of_car, rear_axle_from_center, height_of_rear_axle)
     x = box[0]
     y = box[1]
     z = box[2]
     print('Value of z', z)
-    l = 5
-    h = 1.5
+    l = length_of_car
+    h = height_of_car
     yaw = box[3]
     # get direction arrow
     dir_x = l * np.cos(yaw)
@@ -80,7 +80,7 @@ def create_box_with_arrow(box, color=None):
 import open3d as o3d
 import numpy as np
 
-def draw_clouds_with_boxes(vis, cloud, boxes):
+def draw_clouds_with_boxes(vis, cloud, boxes, length=5, width=2, height=1.5, rear_axle_from_center=2, height_of_rear_axle=0.5):
     """
     vis: open3d.visualization.Visualizer
     cloud: (N, 4)  [x, y, z, intensity]
@@ -104,7 +104,7 @@ def draw_clouds_with_boxes(vis, cloud, boxes):
 
     # create boxes
     for box in boxes:
-        box_o3d, arrow = create_box_with_arrow(box, cur_box_color)
+        box_o3d, arrow = create_box_with_arrow(box, length, width, height, rear_axle_from_center, height_of_rear_axle, cur_box_color)
         boxes_o3d.append(box_o3d)
         boxes_o3d.append(arrow)
     
@@ -195,10 +195,11 @@ def create_coordinate(size=1.0, origin=[0, 0, 0]):
     return o3d.geometry.TriangleMesh.create_coordinate_frame(size=size, origin=origin)
 
 
-def draw_ransac_road(vis, cloud, boxes, expansion_ratio, distance_threshold, ransac_n, num_iterations):
-    _,opponent_fixed_box = visualize_with_ransac_plane(vis, cloud, boxes,expansion_ratio, distance_threshold, ransac_n, num_iterations)
+def draw_ransac_road(vis, cloud, boxes, expansion_ratio, distance_threshold, ransac_n, num_iterations, length, width, height, rear_axle_from_center, height_of_rear_axle):
+    _,opponent_fixed_box = visualize_with_ransac_plane(vis, cloud, boxes,expansion_ratio, distance_threshold, ransac_n, num_iterations, length, width, height, rear_axle_from_center, height_of_rear_axle)
     return opponent_fixed_box
 
 def visualize_fixed_data(vis, idx):
-    draw_clouds_with_boxes(vis,cloud, boxes)
     visualize_corrected_data(vis, idx);
+    draw_clouds_with_boxes(vis,cloud, boxes)
+    
