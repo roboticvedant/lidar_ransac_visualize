@@ -196,7 +196,11 @@ def create_coordinate(size=1.0, origin=[0, 0, 0]):
 
 
 def draw_ransac_road(vis, cloud, boxes, expansion_ratio, distance_threshold, ransac_n, num_iterations, length, width, height, rear_axle_from_center, height_of_rear_axle):
-    _,opponent_fixed_box = visualize_with_ransac_plane(vis, cloud, boxes,expansion_ratio, distance_threshold, ransac_n, num_iterations, length, width, height, rear_axle_from_center, height_of_rear_axle)
+    try:
+         _,opponent_fixed_box = visualize_with_ransac_plane(vis, cloud, boxes,expansion_ratio, distance_threshold, ransac_n, num_iterations, length, width, height, rear_axle_from_center, height_of_rear_axle)
+    except:
+        print('Error in RANSAC')
+        return None
     return opponent_fixed_box
 
 def visualize_fixed_data(vis, idx):

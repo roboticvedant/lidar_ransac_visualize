@@ -66,8 +66,9 @@ class VisualizerSequence:
     def set_side_view(self):
         """Set the camera to a side view."""
         ctr = self.vis.get_view_control()
-        lookat = [0, 0, 0]  # Adjust the point of interest based on your scene
-        front = [1, 0, 0]   # Looking from the side along the X-axis
+        # lookat = [0, 0, 0]  # Adjust the point of interest based on your scene
+        lookat = [self.opponent_pos[0], self.opponent_pos[1], self.opponent_pos[2]] 
+        front = [1, -1.0, -0.025]   # Looking from the side along the X-axis
         up = [0, 0, 1]      # Z-axis as "up" direction
 
         ctr.set_lookat(lookat)
@@ -134,12 +135,17 @@ class VisualizerSequence:
             draw_clouds_with_boxes(self.vis, cloud, boxes, self.length_of_car, self.width_of_car, 
                                     self.height_of_car, self.axle_from_center, self.height_of_rear_axle)
             if self.ransac_visualize_flag:
-                self.fixedOpponentBox= draw_ransac_road(self.vis, cloud, boxes, expansion_ratio=1, 
+                try:
+                    self.fixedOpponentBox= draw_ransac_road(self.vis, cloud, boxes, expansion_ratio=1, 
                                                         distance_threshold=0.1, ransac_n=3, num_iterations=1000, 
                                                         length=self.length_of_car, width=self.width_of_car, 
                                                         height=self.height_of_car,
                                                         rear_axle_from_center=self.axle_from_center, 
                                                         height_of_rear_axle=self.height_of_rear_axle)
+                except:
+                    print('Error in RANSAC')
+                    self.idx += 1
+                    return
         else:
             draw_clouds_with_boxes(self.vis, cloud, boxes)
 
@@ -244,7 +250,7 @@ if __name__ == "__main__":
     argparser.add_argument('-n', '--no_ransac', action='store_false', help='Disable RANSAC visualization')
 
     # Car parameters
-    argparser.add_argument('-s', '--start_idx', type=int, default=0, help='Start index for visualization')
+    argparser.add_argument('-s', '--start_idx', type=int, default=290, help='Start index for visualization')
     argparser.add_argument('-i', '--frame_interval', type=int, default=200, help='Time in milliseconds between frames')
     argparser.add_argument('-l', '--length_of_car', type=float, default=5.0, help='Length of the car')
     argparser.add_argument('-w', '--width_of_car', type=float, default=2.0, help='Width of the car')
