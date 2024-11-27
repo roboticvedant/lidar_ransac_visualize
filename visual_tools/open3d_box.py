@@ -101,7 +101,7 @@ def create_box_from_corners(corners, color=None):
 
 def create_box(box, color=None, length_of_car=5.0, width_of_car=2.0, height_of_car=2.0, rear_axle_from_center=2.0, height_of_rear_axle=0.5):
     """
-    box: list(8) [ x, y, z, dx, dy, dz, yaw]
+    box: list(4) [ x, y, z, yaw]
     """
     box_corners = box2corners(box, length_of_car, width_of_car, height_of_car, rear_axle_from_center, height_of_rear_axle)
     box = create_box_from_corners(box_corners, color)

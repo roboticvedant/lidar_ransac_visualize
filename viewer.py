@@ -5,6 +5,8 @@ import os
 from visual_tools import *  # Assuming this is your existing function
 import shutil
 import argparse
+from sklearn.cluster import DBSCAN
+
 
 class VisualizerSequence:
     def __init__(self, raw_data_dir, fixed_data_dir, start_idx, play_animation, generating_data, 
@@ -98,6 +100,64 @@ class VisualizerSequence:
             self.set_side_view()
         self.is_side_view = not self.is_side_view  # Toggle the flag
 
+    def fix_with_dbscan(self, points, line_set, eps=0.5, min_samples=10):
+        """
+        Cluster the point cloud using DBSCAN and return the corrected x, y centroid
+        of the most relevant cluster (based on the number of points inside the LineSet bounding box).
+        
+        Args:
+            points (numpy.ndarray): Point cloud data (N x 3) where N is the number of points.
+            line_set (open3d.geometry.LineSet): The LineSet to use as a reference for the bounding box.
+            eps (float): The maximum distance between two samples for them to be considered as in the same neighborhood.
+            min_samples (int): The number of samples in a neighborhood for a point to be considered as a core point.
+
+        Returns:
+            tuple: Corrected x, y coordinates of the centroid of the selected cluster.
+        """
+        # Perform DBSCAN clustering
+        clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
+        labels = clustering.labels_
+
+        # Extract unique clusters
+        unique_labels = set(labels)
+        if -1 in unique_labels:
+            unique_labels.remove(-1)  # Exclude noise labeled as -1
+
+        # Get the vertices of the LineSet
+        vertices = np.asarray(line_set.points)
+        min_bound = vertices.min(axis=0)  # [min_x, min_y, min_z]
+        max_bound = vertices.max(axis=0)  # [max_x, max_y, max_z]
+
+        # Initialize variables for tracking the best cluster
+        best_cluster_centroid = None
+        max_points_in_bbox = 0
+
+        for label in unique_labels:
+            # Extract points belonging to this cluster
+            cluster_points = points[labels == label]
+
+            # Check points within the bounding box
+            points_in_bbox = cluster_points[
+                (cluster_points[:, 0] >= min_bound[0]) & (cluster_points[:, 0] <= max_bound[0]) &
+                (cluster_points[:, 1] >= min_bound[1]) & (cluster_points[:, 1] <= max_bound[1]) &
+                (cluster_points[:, 2] >= min_bound[2]) & (cluster_points[:, 2] <= max_bound[2])
+            ]
+            num_points_in_bbox = len(points_in_bbox)
+
+            # Select the cluster with the maximum points inside the bounding box
+            if num_points_in_bbox > max_points_in_bbox:
+                max_points_in_bbox = num_points_in_bbox
+                best_cluster_centroid = cluster_points.mean(axis=0)  # [x, y, z]
+
+        if best_cluster_centroid is not None:
+            corrected_x = best_cluster_centroid[0]
+            corrected_y = best_cluster_centroid[1]
+            print(f"Corrected Centroid X: {corrected_x}, Y: {corrected_y}")
+            return corrected_x, corrected_y
+        else:
+            print("No valid cluster found inside the bounding box.")
+            return None, None
+
     def next_scene(self):
         """Load and display the next frame."""
         self.vis.clear_geometries()
@@ -116,8 +176,8 @@ class VisualizerSequence:
                             self.vis.destroy_window()
                             return True
                         return self.next_scene()
-                    except:
-                        print("End of data reached, caught by exception") # end if it gets in infinite loop, not ideal but good enoguh for now
+                    except Exception as e:
+                        print(f"End of data reached, caught by exception {e}") # end if it gets in infinite loop, not ideal but good enoguh for now
                         self.vis.destroy_window()
                         return True
             else:
@@ -136,14 +196,27 @@ class VisualizerSequence:
                                     self.height_of_car, self.axle_from_center, self.height_of_rear_axle)
             if self.ransac_visualize_flag:
                 try:
-                    self.fixedOpponentBox= draw_ransac_road(self.vis, cloud, boxes, expansion_ratio=1, 
+                    adjusted_bb = draw_ransac_road(self.vis, cloud, boxes, expansion_ratio=1, 
                                                         distance_threshold=0.1, ransac_n=3, num_iterations=1000, 
                                                         length=self.length_of_car, width=self.width_of_car, 
                                                         height=self.height_of_car,
                                                         rear_axle_from_center=self.axle_from_center, 
                                                         height_of_rear_axle=self.height_of_rear_axle)
-                except:
-                    print('Error in RANSAC')
+
+                    db_cluster = self.fix_with_dbscan(cloud, adjusted_bb)
+                    print(f"DBSCAN Cluster: {db_cluster}")
+                    if db_cluster is not None:
+                        print("Visualizing new BB")
+                        cluster_visualization(self.vis, adjusted_bb, db_cluster[0], db_cluster[1])
+                        self.fixedOpponentBox = db_cluster
+                    else:
+                        print("DBSCAN failed, visualizing original BB")
+                        self.fixedOpponentBox = adjusted_bb
+                    
+                    print(f"Fixed Opponent Box: {self.fixedOpponentBox}")
+           
+                except Exception as e:
+                    print(f'Error in RANSAC {e}')
                     self.idx += 1
                     return
         else:
@@ -250,7 +323,7 @@ if __name__ == "__main__":
     argparser.add_argument('-n', '--no_ransac', action='store_false', help='Disable RANSAC visualization')
 
     # Car parameters
-    argparser.add_argument('-s', '--start_idx', type=int, default=290, help='Start index for visualization')
+    argparser.add_argument('-s', '--start_idx', type=int, default=0, help='Start index for visualization')
     argparser.add_argument('-i', '--frame_interval', type=int, default=200, help='Time in milliseconds between frames')
     argparser.add_argument('-l', '--length_of_car', type=float, default=5.0, help='Length of the car')
     argparser.add_argument('-w', '--width_of_car', type=float, default=2.0, help='Width of the car')

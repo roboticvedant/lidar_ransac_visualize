@@ -6,6 +6,10 @@ from .open3d_coordinate import create_coordinate
 from .open3d_arrow import create_arrow
 from .open3d_box import create_box
 from .ransac_visualization import *
+from .cluster_visualization import *
+
+def cluster_visualization(vis, boxes, x_center, y_center):
+    return draw_box_from_cluster(vis, boxes, x_center, y_center)
 
 
 def create_box_with_arrow(box, length_of_car, width_of_car, height_of_car, rear_axle_from_center, height_of_rear_axle, color=None,):
