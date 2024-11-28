@@ -8,6 +8,65 @@ from .open3d_box import create_box
 from .ransac_visualization import *
 from .cluster_visualization import *
 
+def create_bounding_box_line_set(centroid, yaw, dx=2.0, dy=1.5, dz=1.0):
+    """
+    Create a line set for a bounding box from position (x,y,z), yaw angle, and dimensions.
+    """
+    # Define the 8 vertices of the box relative to center (before rotation)
+
+    l, w, h = dx/2, dy/2, dz/2
+    vertices_base = np.array([
+        [ l,  w,  h], # 0
+        [-l,  w,  h], # 1
+        [-l, -w,  h], # 2
+        [ l, -w,  h], # 3
+        [ l,  w, -h], # 4
+        [-l,  w, -h], # 5
+        [-l, -w, -h], # 6
+        [ l, -w, -h]  # 7
+    ])
+    
+    # Create rotation matrix around z-axis
+    rotation_matrix = np.array([
+        [np.cos(yaw), -np.sin(yaw), 0],
+        [np.sin(yaw),  np.cos(yaw), 0],
+        [0,            0,           1]
+    ])
+    
+    # Rotate vertices
+    vertices_rotated = np.dot(vertices_base, rotation_matrix.T)
+    
+    # Translate vertices to final position
+    vertices = vertices_rotated + np.array(centroid)
+    
+    # Define the 12 edges of the box using vertex indices
+    lines = np.array([
+        [0, 1], [1, 2], [2, 3], [3, 0],  # Top face
+        [4, 5], [5, 6], [6, 7], [7, 4],  # Bottom face
+        [0, 4], [1, 5], [2, 6], [3, 7]   # Connecting edges
+    ])
+    
+    # Create LineSet
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(vertices)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    
+    # Set color for all lines (green for the new box)
+    colors = np.array([[0, 1, 0] for _ in range(len(lines))])
+    line_set.colors = o3d.utility.Vector3dVector(colors)
+    
+    return line_set
+
+def extract_yaw_from_line_set(line_set):
+    """
+    Extract the yaw angle from a line set by analyzing the orientation of the box.
+    """
+    vertices = np.asarray(line_set.points)
+    # Get front face vertices (assuming first four points are the top face)
+    front_edge = vertices[1] - vertices[0]  # Vector along front edge
+    yaw = np.arctan2(front_edge[1], front_edge[0])
+    return yaw
+
 def cluster_visualization(vis, boxes, x_center, y_center):
     return draw_box_from_cluster(vis, boxes, x_center, y_center)
 

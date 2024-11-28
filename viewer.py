@@ -100,63 +100,122 @@ class VisualizerSequence:
             self.set_side_view()
         self.is_side_view = not self.is_side_view  # Toggle the flag
 
-    def fix_with_dbscan(self, points, line_set, eps=0.5, min_samples=10):
+    def fix_with_dbscan(self, points, line_set, vis=None, eps=0.5, min_samples=10, visualize=True, cluster_box = True):
         """
         Cluster the point cloud using DBSCAN and return the corrected x, y centroid
-        of the most relevant cluster (based on the number of points inside the LineSet bounding box).
-        
-        Args:
-            points (numpy.ndarray): Point cloud data (N x 3) where N is the number of points.
-            line_set (open3d.geometry.LineSet): The LineSet to use as a reference for the bounding box.
-            eps (float): The maximum distance between two samples for them to be considered as in the same neighborhood.
-            min_samples (int): The number of samples in a neighborhood for a point to be considered as a core point.
-
-        Returns:
-            tuple: Corrected x, y coordinates of the centroid of the selected cluster.
+        of the most relevant cluster.
         """
-        # Perform DBSCAN clustering
-        clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
-        labels = clustering.labels_
+        try:
+            # Perform DBSCAN clustering
+            original_yaw = extract_yaw_from_line_set(line_set)
+            clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
+            labels = clustering.labels_
 
-        # Extract unique clusters
-        unique_labels = set(labels)
-        if -1 in unique_labels:
-            unique_labels.remove(-1)  # Exclude noise labeled as -1
+            # Extract unique clusters
+            unique_labels = set(labels)
+            if -1 in unique_labels:
+                unique_labels.remove(-1)  # Exclude noise labeled as -1
 
-        # Get the vertices of the LineSet
-        vertices = np.asarray(line_set.points)
-        min_bound = vertices.min(axis=0)  # [min_x, min_y, min_z]
-        max_bound = vertices.max(axis=0)  # [max_x, max_y, max_z]
+            # Get the vertices of the LineSet
+            vertices = np.asarray(line_set.points)
+            min_bound = vertices.min(axis=0)  # [min_x, min_y, min_z]
+            max_bound = vertices.max(axis=0)  # [max_x, max_y, max_z]
 
-        # Initialize variables for tracking the best cluster
-        best_cluster_centroid = None
-        max_points_in_bbox = 0
+            # Initialize variables for tracking the best cluster
+            best_cluster_centroid = None
+            max_points_in_bbox = 0
+            best_cluster_label = None
 
-        for label in unique_labels:
-            # Extract points belonging to this cluster
-            cluster_points = points[labels == label]
-
-            # Check points within the bounding box
-            points_in_bbox = cluster_points[
-                (cluster_points[:, 0] >= min_bound[0]) & (cluster_points[:, 0] <= max_bound[0]) &
-                (cluster_points[:, 1] >= min_bound[1]) & (cluster_points[:, 1] <= max_bound[1]) &
-                (cluster_points[:, 2] >= min_bound[2]) & (cluster_points[:, 2] <= max_bound[2])
+            # Create a point cloud for visualization
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(points)
+            
+            # Color palette for clusters
+            color_palette = [
+                [1, 0, 0],    # Red
+                [0, 1, 0],    # Green
+                [0, 0, 1],    # Blue
+                [1, 1, 0],    # Yellow
+                [1, 0, 1],    # Magenta
+                [0, 1, 1],    # Cyan
+                [0.5, 0.5, 0.5]  # Gray for noise
             ]
-            num_points_in_bbox = len(points_in_bbox)
 
-            # Select the cluster with the maximum points inside the bounding box
-            if num_points_in_bbox > max_points_in_bbox:
-                max_points_in_bbox = num_points_in_bbox
-                best_cluster_centroid = cluster_points.mean(axis=0)  # [x, y, z]
+            # Color the point cloud
+            colors = np.zeros_like(points, dtype=float)
+            for i, label in enumerate(labels):
+                if label == -1:
+                    # Noise points in gray
+                    colors[i] = color_palette[-1]
+                else:
+                    # Cycle through colors for different clusters
+                    colors[i] = color_palette[label % (len(color_palette) - 1)]
 
-        if best_cluster_centroid is not None:
-            corrected_x = best_cluster_centroid[0]
-            corrected_y = best_cluster_centroid[1]
-            print(f"Corrected Centroid X: {corrected_x}, Y: {corrected_y}")
-            return corrected_x, corrected_y
-        else:
-            print("No valid cluster found inside the bounding box.")
-            return None, None
+            # Find the best cluster
+            for label in unique_labels:
+                # Extract points belonging to this cluster
+                cluster_points = points[labels == label]
+
+                # Check points within the bounding box
+                points_in_bbox = cluster_points[
+                    (cluster_points[:, 0] >= min_bound[0]) & (cluster_points[:, 0] <= max_bound[0]) &
+                    (cluster_points[:, 1] >= min_bound[1]) & (cluster_points[:, 1] <= max_bound[1]) &
+                    (cluster_points[:, 2] >= min_bound[2]) & (cluster_points[:, 2] <= max_bound[2])
+                ]
+                num_points_in_bbox = len(points_in_bbox)
+
+                # Select the cluster with the maximum points inside the bounding box
+                if num_points_in_bbox > max_points_in_bbox:
+                    max_points_in_bbox = num_points_in_bbox
+                    best_cluster_centroid = cluster_points.mean(axis=0)  # [x, y, z]
+                    best_cluster_label = label
+
+            # Set colors to the point cloud
+            pcd.colors = o3d.utility.Vector3dVector(colors)
+
+            if cluster_box:
+                # Create new bounding box with cluster centroid and original yaw
+                new_box = create_bounding_box_line_set(best_cluster_centroid, original_yaw)
+            
+
+            # Visualization
+            if vis is not None and visualize and best_cluster_centroid is not None:
+                # Clear previous visualizations
+                vis.clear_geometries() # Clear the previous visualization to avoid overlap 
+                
+                # Add the colored point cloud and line set
+                vis.add_geometry(pcd)
+                vis.add_geometry(new_box)
+
+                # Optional: Add a coordinate frame to mark the cluster location
+                coord_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
+                    size=1.0, 
+                    origin=best_cluster_centroid
+                )
+                coord_frame.paint_uniform_color([1, 0, 0])  # Red coordinate frame
+                vis.add_geometry(coord_frame)
+
+                # Print cluster information
+                print(f"Best Cluster Details:")
+                print(f"  Location: {best_cluster_centroid}")
+                print(f"  Points in Cluster: {max_points_in_bbox}")
+
+                vis.poll_events()
+                vis.update_renderer()
+
+            # Return results
+            if best_cluster_centroid is not None:
+                corrected_x = best_cluster_centroid[0]
+                corrected_y = best_cluster_centroid[1]
+                print(f"Corrected Centroid X: {corrected_x}, Y: {corrected_y}")
+                return corrected_x, corrected_y, pcd
+            else:
+                print("No valid cluster found inside the bounding box.")
+                return None, None, None
+
+        except Exception as e:
+            print(f"Error in DBSCAN clustering: {e}")
+            return None, None, None
 
     def next_scene(self):
         """Load and display the next frame."""
@@ -203,22 +262,21 @@ class VisualizerSequence:
                                                         rear_axle_from_center=self.axle_from_center, 
                                                         height_of_rear_axle=self.height_of_rear_axle)
 
-                    db_cluster = self.fix_with_dbscan(cloud, adjusted_bb)
+                    db_cluster = self.fix_with_dbscan(cloud, adjusted_bb, vis=self.vis)
                     print(f"DBSCAN Cluster: {db_cluster}")
                     if db_cluster is not None:
                         print("Visualizing new BB")
-                        cluster_visualization(self.vis, adjusted_bb, db_cluster[0], db_cluster[1])
                         self.fixedOpponentBox = db_cluster
                     else:
                         print("DBSCAN failed, visualizing original BB")
                         self.fixedOpponentBox = adjusted_bb
                     
                     print(f"Fixed Opponent Box: {self.fixedOpponentBox}")
-           
+            
                 except Exception as e:
                     print(f'Error in RANSAC {e}')
                     self.idx += 1
-                    return
+                    return self.next_scene()
         else:
             draw_clouds_with_boxes(self.vis, cloud, boxes)
 

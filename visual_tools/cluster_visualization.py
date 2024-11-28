@@ -40,3 +40,5 @@ def draw_box_from_cluster(vis, bounding_box_init, x_center, y_center):
     vis.add_geometry(bounding_box_init, reset_bounding_box=False)
 
     return bounding_box_init
+
+
