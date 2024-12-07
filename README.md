@@ -96,3 +96,5 @@ visualizer = VisualizerSequence(
 )
 visualizer.run()
 ```
+## Special Thanks
+- Special thanks to Pragyan Dahal in guiding and providing boiler plate code for visualizer
